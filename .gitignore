@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+coverage/
+playwright-report/
+test-results/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+
+# Local assistant instructions (kept out of the repository on purpose)
+CLAUDE.md
+
+# Saved Playwright login sessions
+apps/web/e2e/.auth/

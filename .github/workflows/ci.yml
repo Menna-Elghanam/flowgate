@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint, typecheck, unit and API tests
+    runs-on: ubuntu-latest
+    services:
+      # Same shifted ports as docker-compose, so the test defaults work unchanged.
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: flowgate
+          POSTGRES_PASSWORD: flowgate
+          POSTGRES_DB: flowgate_test
+        ports: ['5441:5432']
+        options: >-
+          --health-cmd "pg_isready -U flowgate" --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports: ['6380:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @flowgate/workflow build
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+
+  e2e:
+    name: Acceptance tests (Playwright)
+    runs-on: ubuntu-latest
+    needs: checks
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: flowgate
+          POSTGRES_PASSWORD: flowgate
+          POSTGRES_DB: flowgate
+        ports: ['5441:5432']
+        options: >-
+          --health-cmd "pg_isready -U flowgate" --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports: ['6380:6379']
+      mailpit:
+        image: axllent/mailpit:v1.27
+        ports: ['1026:1025']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cp apps/api/.env.example apps/api/.env && cp apps/web/.env.example apps/web/.env
+      - run: pnpm build
+      - run: pnpm db:migrate
+      - run: pnpm --filter @flowgate/api db:reset
+      - name: Start API and web
+        env:
+          # Real env vars win over .env; the suite logs in more often than a person would.
+          AUTH_RATE_LIMIT: '100'
+        run: |
+          (cd apps/api && node dist/main.js > ../../api.log 2>&1 &)
+          (cd apps/web && pnpm start > ../../web.log 2>&1 &)
+          npx --yes wait-on@8.0.3 --timeout 60000 http://localhost:4000/health http://localhost:3000/login
+      - run: pnpm --filter @flowgate/web exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+        env:
+          CI: 'true'
+      - name: Server logs
+        if: failure()
+        run: tail -n 200 api.log web.log
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7

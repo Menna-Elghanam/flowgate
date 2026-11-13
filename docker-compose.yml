@@ -1,0 +1,40 @@
+# Local development services. Ports are shifted (5441, 6380, 1026, 8026) so they don't
+# clash with other projects running the default ports.
+name: flowgate
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: flowgate
+      POSTGRES_PASSWORD: flowgate
+      POSTGRES_DB: flowgate
+    ports:
+      - '5441:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U flowgate']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - '6380:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - '1026:1025'
+      - '8026:8025'
+
+volumes:
+  postgres-data:

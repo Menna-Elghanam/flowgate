@@ -1,0 +1,26 @@
+{
+  "name": "@flowgate/workflow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pure workflow logic shared by the API and the web app: definition schema, validation, routing, state machines.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "jest"
+  },
+  "dependencies": {
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.4.0",
+    "typescript": "~5.8.3"
+  }
+}
