@@ -8,6 +8,22 @@ const config: NextConfig = {
   async rewrites() {
     return [{ source: '/api/:path*', destination: `${apiUrl}/:path*` }];
   },
+  // The API sets these with helmet; the pages come from Next, so they need their own.
+  // No framing stops clickjacking (a hidden Flowgate page under a fake "Approve" button).
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        ],
+      },
+    ];
+  },
+  poweredByHeader: false,
   // Linting runs once for the whole monorepo (`pnpm lint`), not again inside `next build`.
   eslint: { ignoreDuringBuilds: true },
 };

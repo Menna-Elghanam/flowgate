@@ -26,12 +26,22 @@ class CorsIoAdapter extends IoAdapter {
 
 const httpLogger = new Logger('HTTP');
 
+/**
+ * An invite link's token is the secret that lets someone join an organization, and it is
+ * part of the URL. Logs are read by more people and tools than the database, so it never
+ * goes there.
+ */
+export function redactUrl(url: string): string {
+  return url.replace(/\/invites\/[^/?#]+/g, '/invites/[redacted]');
+}
+
 function logRequests(req: Request, res: Response, next: NextFunction): void {
   const started = performance.now();
   res.on('finish', () => {
     const ms = Math.round(performance.now() - started);
     const user = (req as AppRequest).user?.id ?? '-';
-    httpLogger.log(`${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms user=${user}`);
+    const url = redactUrl(req.originalUrl);
+    httpLogger.log(`${req.method} ${url} ${res.statusCode} ${ms}ms user=${user}`);
   });
   next();
 }

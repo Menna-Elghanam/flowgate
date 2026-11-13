@@ -17,8 +17,23 @@ const configSchema = z.object({
   SWEEP_INTERVAL_MS: z.coerce.number().int().min(1000).default(60_000),
   AUTH_RATE_LIMIT: z.coerce.number().int().min(1).default(10),
 });
+// Without Secure, the browser would also send the session cookie over plain HTTP. Easy to
+// forget when deploying, so production refuses to start instead.
+const checkedConfigSchema = configSchema.refine(
+  (config) => config.NODE_ENV !== 'production' || config.COOKIE_SECURE,
+  { path: ['COOKIE_SECURE'], message: 'must be true in production (sessions need HTTPS)' },
+);
 
 export type Config = z.infer<typeof configSchema>;
+
+export function parseConfig(env: Record<string, string | undefined>): Config {
+  const parsed = checkedConfigSchema.safeParse(env);
+  if (!parsed.success) {
+    const problems = parsed.error.issues.map((i) => `  - ${i.path.join('.')}: ${i.message}`);
+    throw new Error(`Invalid configuration:\n${problems.join('\n')}`);
+  }
+  return parsed.data;
+}
 
 let cached: Config | undefined;
 
@@ -33,12 +48,7 @@ export function loadConfig(): Config {
   } catch {
     // No .env file: rely on real environment variables (CI, containers).
   }
-  const parsed = configSchema.safeParse(process.env);
-  if (!parsed.success) {
-    const problems = parsed.error.issues.map((i) => `  - ${i.path.join('.')}: ${i.message}`);
-    throw new Error(`Invalid configuration:\n${problems.join('\n')}`);
-  }
-  cached = parsed.data;
+  cached = parseConfig(process.env);
   return cached;
 }
 
