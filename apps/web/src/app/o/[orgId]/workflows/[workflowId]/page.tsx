@@ -110,14 +110,20 @@ function Settings({ orgId, workflow }: { orgId: string; workflow: WorkflowDetail
   );
 }
 
+type Notice = { ok: boolean; text: string } | null;
+
 function Builder({
   orgId,
   workflow,
   members,
+  notice,
+  setNotice,
 }: {
   orgId: string;
   workflow: WorkflowDetail;
   members: Member[];
+  notice: Notice;
+  setNotice: (notice: Notice) => void;
 }) {
   const queryClient = useQueryClient();
   const initial = (workflow.draft ?? workflow.published)?.definition;
@@ -129,7 +135,6 @@ function Builder({
   const [selection, setSelection] = useState<Selection>(null);
   const [tab, setTab] = useState<Tab>('flow');
   const [busy, setBusy] = useState<'save' | 'publish' | 'discard' | null>(null);
-  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
 
   const update = useCallback((fn: Updater) => setDefinition((d) => (d ? fn(d) : d)), []);
   const dirty = useMemo(
@@ -430,6 +435,8 @@ function Builder({
 function BuilderLoader({ orgId, workflowId }: { orgId: string; workflowId: string }) {
   const workflow = useWorkflow(orgId, workflowId);
   const members = useMembers(orgId);
+  // Lives here, not in Builder: publishing re-mounts Builder, and "Version N is live" must survive it.
+  const [notice, setNotice] = useState<Notice>(null);
   if (workflow.isPending || members.isPending) return <LoadingState />;
   if (workflow.isError)
     return <ErrorState message={errorMessage(workflow.error)} onRetry={() => workflow.refetch()} />;
@@ -443,6 +450,8 @@ function BuilderLoader({ orgId, workflowId }: { orgId: string; workflowId: strin
       orgId={orgId}
       workflow={workflow.data}
       members={members.data}
+      notice={notice}
+      setNotice={setNotice}
     />
   );
 }
